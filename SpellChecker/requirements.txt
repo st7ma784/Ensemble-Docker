@@ -1,1 +1,4 @@
 unidecode
+langdetect
+pymongo
+datetime

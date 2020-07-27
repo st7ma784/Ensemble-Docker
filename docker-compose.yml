@@ -1,23 +1,23 @@
 version: '3.1'
 
 services:
-  SpellChecker	:
+  spellchecker:
     build: SpellChecker
-    image: SpellChecker
+    image: spellchecker
     env_file:
       - ./SpellChecker/.env
     volumes:
       - ./models/:/app/
-    depends:
-      - LanguageBuilder
+    links:
+      - mongo:mongo
       
-  LanguageBuilder:
+  languagebuilder:
     build: LanguageBuilder
-    image: LanguageBuilder
+    image: languagebuilder
     env_file:
       - ./LanguageBuilder/.env
     volumes:
-      - ./textfiles/:/app/
+      - ./textfiles/:/app/textfiles/
     links:
       - mongo:mongo
         

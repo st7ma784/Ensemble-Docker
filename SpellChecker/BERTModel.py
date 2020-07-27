@@ -5,6 +5,7 @@ import gensim
 import os
 from gensim import *
 from time import time
+from datetime import datetime
 from gensim import utils
 from unidecode import unidecode
 from itertools import repeat
@@ -134,18 +135,21 @@ def make_model(language):
     Stream=Connect(URL,language)[Sentences]
     cursor = Stream.find({})
     word_vector_model = gensim.models.Word2Vec([sentence.split() for sentence in cursor],size=200, window=8, min_count=10)
-    word_vector_model.save("".join([language,"word2vec.model"]))
     print('Time to train model on everything: {} mins'.format(round((time() - t) / 60, 2)))
+    return word_vector_model
 correctiondictionary=dict()
 def main():
 
-    for language in GetLanguages():
-        print("Beginning with language : " + language)
+    with Pool(os.cpu_count()) as p:
+        p.starmap(buildLanguage,GetLanguages())   
+def buildLanguage(language):
+	print("Beginning with language : " + language)
         try:
             model = Word2Vec.load("".join([language,"word2vec.model"]))
         except:
             print("cant find models saved... lets make some")
             model=make_model(language)
+            model.save("".join([language,"word2vec.model"]))
         finally:
             print("building word ranks")
             models[language]=model
@@ -156,11 +160,11 @@ def main():
                 w_rank[word] = i
             Words[language] = w_rank
     	correctiondictionary[language]={}
-
-    '''print("Begining document fixing")
+def fixAll():
+    print("Begining document fixing")
     with Pool(os.cpu_count()) as p:
         p.starmap(FixDocument,zip(list(filter(lambda fname: fname.endswith('.txt'), os.listdir(dirname))),repeat(dirname)))
-    '''
+    
 
 if __name__=="__main__":
     freeze_support()

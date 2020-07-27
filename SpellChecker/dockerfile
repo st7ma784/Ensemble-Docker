@@ -10,4 +10,4 @@ COPY --from=builder /install /usr/local
 COPY . /app
 WORKDIR /app
 # Run the specified command within the container.
-CMD [ "python", "BERTmodel.py"]
+CMD [ "python", "BERTModel.py"]
