@@ -88,6 +88,7 @@ def WriteLanguages(languages):
 
 def main():
     global languages
+    
     for language in set(languages):
         print("creating file list : " + language)
         samples=make_model(language)

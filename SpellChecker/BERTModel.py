@@ -164,7 +164,9 @@ def fixAll():
     
 correctiondictionary=dict()
 def main():
-    languages=[language["code"] for language in GetLanguages()]
+    languages=set([language.get("code",'en') for language in GetLanguages()])
+    if languages==[]:
+        languages=["en"]
     print(languages)
     with Pool(os.cpu_count()) as p:
         p.starmap(buildLanguage,languages)   
