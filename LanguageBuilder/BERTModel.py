@@ -99,7 +99,7 @@ def main():
         Sentences=LanguageDB["Sentences"]
         #print(list(dict({"id":id, "text":sentence}) for id,sentence in enumerate([sentence for sentence in samples])))
         Sentences.insert_many(list(dict({"id":id, "text":sentence}) for id,sentence in enumerate([sentence for sentence in samples])))
-        languages|=samples.languagesfound #add found languages to our set., 
+        languages|=samples.knownlanguages #add found languages to our set., 
     print("Languages found :" + languages)
     WriteLanguages(list(languages))
 if __name__=="__main__":
