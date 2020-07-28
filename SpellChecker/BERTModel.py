@@ -112,9 +112,9 @@ def FixSentence(sentence):
             newsentence=newsentence.replace(word,correctiondictionary[language][word])
     if sentence!=newsentence:
         print( sentence + " :=> " + newsentence)
-    #Sentence=" ".join(newsentence)
-    
+    #Sentence=" ".join(newsentence)    
     return newsentence
+
 def Connect(URL,language):
 
   mongo=pymongo.MongoClient(URL)
@@ -134,14 +134,14 @@ def make_model(language):
     t = time()
     Stream=Connect(URL,language)[Sentences]
     cursor = Stream.find({})
-    word_vector_model = gensim.models.Word2Vec([sentence.split() for sentence in cursor],size=200, window=8, min_count=10)
+    word_vector_model = gensim.models.Word2Vec([sentence["text"].split() for sentence in cursor],size=200, window=8, min_count=10)
     print('Time to train model on everything: {} mins'.format(round((time() - t) / 60, 2)))
     return word_vector_model
 correctiondictionary=dict()
 def main():
-
     with Pool(os.cpu_count()) as p:
         p.starmap(buildLanguage,GetLanguages())   
+
 def buildLanguage(language):
 	print("Beginning with language : " + language)
         try:
