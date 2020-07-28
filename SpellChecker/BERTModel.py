@@ -14,7 +14,7 @@ from gensim.summarization.textcleaner import tokenize_by_word
 import copy
 from langdetect import detect, lang_detect_exception
 import concurrent.futures as cf 
-
+import pymongo
 
 Words={}
 languages=['en']
@@ -137,34 +137,38 @@ def make_model(language):
     word_vector_model = gensim.models.Word2Vec([sentence["text"].split() for sentence in cursor],size=200, window=8, min_count=10)
     print('Time to train model on everything: {} mins'.format(round((time() - t) / 60, 2)))
     return word_vector_model
-correctiondictionary=dict()
-def main():
-    with Pool(os.cpu_count()) as p:
-        p.starmap(buildLanguage,GetLanguages())   
+
 
 def buildLanguage(language):
-	print("Beginning with language : " + language)
-        try:
-            model = Word2Vec.load("".join([language,"word2vec.model"]))
-        except:
-            print("cant find models saved... lets make some")
-            model=make_model(language)
-            model.save("".join([language,"word2vec.model"]))
-        finally:
-            print("building word ranks")
-            models[language]=model
-            words = model.wv.vocab
-            print(len(words))
-            w_rank = {}
-            for i,word in enumerate(words):
-                w_rank[word] = i
-            Words[language] = w_rank
-    	correctiondictionary[language]={}
+    print("Beginning with language : " + language)
+    try:
+        model = Word2Vec.load("".join([language,"word2vec.model"]))
+    except:
+        print("cant find models saved... lets make some")
+        model=make_model(language)
+        model.save("".join([language,"word2vec.model"]))
+    finally:
+        print("building word ranks")
+        models[language]=model
+        words = model.wv.vocab
+        print(len(words))
+        w_rank = {}
+        for i,word in enumerate(words):
+            w_rank[word] = i
+        Words[language] = w_rank
+    correctiondictionary[language]={}
 def fixAll():
     print("Begining document fixing")
     with Pool(os.cpu_count()) as p:
         p.starmap(FixDocument,zip(list(filter(lambda fname: fname.endswith('.txt'), os.listdir(dirname))),repeat(dirname)))
     
+correctiondictionary=dict()
+def main():
+    languages=[language["code"] for language in GetLanguages()]
+    print(languages)
+    with Pool(os.cpu_count()) as p:
+        p.starmap(buildLanguage,languages)   
+
 
 if __name__=="__main__":
     freeze_support()

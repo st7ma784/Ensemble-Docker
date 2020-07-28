@@ -84,7 +84,7 @@ URL= os.environ.get("MONGO_CLUSTERURI")
 Words={}
 languages=set(['en'])
 def WriteLanguages(languages):
-	Connect(URL,"LANGUAGES")["CODES"].insert_many(dict({"id":id, "code":code}) for id,code in enumerate(list(languages)))
+	Connect(URL,"LANGUAGES")["CODES"].insert_many(dict({"code":code}) for code in list(languages))
 
 def main():
     global languages
@@ -99,7 +99,9 @@ def main():
         #print(list(dict({"id":id, "text":sentence}) for id,sentence in enumerate([sentence for sentence in samples])))
         Sentences.insert_many(list(dict({"id":id, "text":sentence}) for id,sentence in enumerate([sentence for sentence in samples])))
         languages|=samples.languagesfound #add found languages to our set., 
+    print("Languages found :" + languages)
     WriteLanguages(list(languages))
 if __name__=="__main__":
     freeze_support()
     main()
+    print("finished putting sentences in DB...")

@@ -7,7 +7,7 @@ services:
     env_file:
       - ./SpellChecker/.env
     volumes:
-      - ./models/:/app/
+      - ./models/:/app/models/
     links:
       - mongo:mongo
       

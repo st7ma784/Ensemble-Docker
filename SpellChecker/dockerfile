@@ -1,12 +1,9 @@
 FROM tsutomu7/gensim as base
-FROM base as builder
-RUN mkdir /install
-WORKDIR /install
-COPY requirements.txt /requirements.txt
-RUN pip install --prefix="/install" -r /requirements.txt
-FROM base
+FROM base 
 
-COPY --from=builder /install /usr/local
+COPY requirements.txt /requirements.txt
+RUN pip install  -r /requirements.txt
+
 COPY . /app
 WORKDIR /app
 # Run the specified command within the container.
