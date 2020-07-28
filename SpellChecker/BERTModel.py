@@ -24,6 +24,9 @@ def words(text): return re.findall(r'\w+', text.lower())
 def P(language,word): 
     "Probability of `word`."
     # use inverse of rank as proxy
+    # get model
+    # get sentence
+    # how well does the word fit in the sentence. 
     # returns 0 if the word isn't in the dictionary
     return - Words[language].get(word, 0)
 
@@ -115,25 +118,28 @@ def FixSentence(sentence):
     #Sentence=" ".join(newsentence)    
     return newsentence
 
-def Connect(URL,language):
+def Connect(URL,collection):
 
   mongo=pymongo.MongoClient(URL)
   db= mongo["Connects"] #Connect to DB
   col=db["Access"]
   col.insert_one({"time":datetime.now()})
-  db=mongo[language]
+  db=mongo[collection]
   return db
 
 URL= os.environ.get("MONGO_CLUSTERURI")
 
 def GetLanguages():
-	return list(Connect(URL,"LANGUAGES")["CODES"].find({}))
+    print("fetching languages")
+    found=list(Connect(URL,"LANGUAGES")["CODES"].find({}))
+    print(found)
+    return found
 #Copora=gensim.corpora.textcorpus.TextCorpus(input="./test/")
 def make_model(language):
     print("Creating word model")
     t = time()
-    Stream=Connect(URL,language)[Sentences]
-    cursor = Stream.find({})
+    Stream=Connect(URL,"sentences")["Sentences"]
+    cursor = Stream.find({"lang":language})
     word_vector_model = gensim.models.Word2Vec([sentence["text"].split() for sentence in cursor],size=200, window=8, min_count=10)
     print('Time to train model on everything: {} mins'.format(round((time() - t) / 60, 2)))
     return word_vector_model
@@ -165,11 +171,11 @@ def fixAll():
 correctiondictionary=dict()
 def main():
     languages=set([language.get("code",'en') for language in GetLanguages()])
-    if languages==[]:
-        languages=["en"]
+    if languages==set():
+        languages=set(["en"])
     print(languages)
     with Pool(os.cpu_count()) as p:
-        p.starmap(buildLanguage,languages)   
+        p.starmap(buildLanguage,list(languages))   
 
 
 if __name__=="__main__":
