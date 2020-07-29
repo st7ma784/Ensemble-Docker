@@ -131,9 +131,9 @@ URL= os.environ.get("MONGO_CLUSTERURI")
 
 def GetLanguages():
     print("fetching languages")
-    found=list(Connect(URL,"LANGUAGES")["CODES"].find({}))
+    found=list(Connect(URL,"sentences")["Sentences"].find({}).distinct("lang"))
     print(found)
-    return [i["code"] for i in found]
+    return found
 #Copora=gensim.corpora.textcorpus.TextCorpus(input="./test/")
 def make_model(language):
     print("Creating word model")
@@ -148,11 +148,11 @@ def make_model(language):
 def buildLanguage(language):
     print("Beginning with language : " + language)
     try:
-        model = Word2Vec.load("".join([language,"word2vec.model"]))
+        model = Word2Vec.load(os.path.join("models","".join([language,"word2vec.model"])))
     except:
         print("cant find models saved... lets make some")
         model=make_model(language)
-        model.save("".join([language,"word2vec.model"]))
+        model.save(os.path.join("models","".join([language,"word2vec.model"])))
     finally:
         print("building word ranks")
         models[language]=model
@@ -171,7 +171,7 @@ def fixAll():
     
 correctiondictionary=dict()
 def main():
-    languages=set([language.get("code",'en') for language in GetLanguages()])
+    languages=set([language for language in GetLanguages()])
     if languages==set():
         languages=set(["en"])
     print(languages)
