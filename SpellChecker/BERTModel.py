@@ -133,7 +133,7 @@ def GetLanguages():
     print("fetching languages")
     found=list(Connect(URL,"LANGUAGES")["CODES"].find({}))
     print(found)
-    return found
+    return [i["code"] for i in found]
 #Copora=gensim.corpora.textcorpus.TextCorpus(input="./test/")
 def make_model(language):
     print("Creating word model")
@@ -163,6 +163,7 @@ def buildLanguage(language):
             w_rank[word] = i
         Words[language] = w_rank
     correctiondictionary[language]={}
+
 def fixAll():
     print("Begining document fixing")
     with Pool(os.cpu_count()) as p:
@@ -175,7 +176,7 @@ def main():
         languages=set(["en"])
     print(languages)
     with Pool(os.cpu_count()) as p:
-        p.starmap(buildLanguage,list(languages))   
+        p.map(buildLanguage,list(languages))   
 
 
 if __name__=="__main__":

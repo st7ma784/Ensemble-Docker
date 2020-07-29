@@ -34,8 +34,10 @@ def Connect(URL,collection="sentences"):
 
 URL= os.environ.get("MONGO_CLUSTERURI")
 knownlanguages=set(['en'])
-def WriteLanguages(languages):
-	Connect(URL,"LANGUAGES")["CODES"].insert_many(dict({"code":code}) for code in list(languages))
+def WriteLanguages():
+    global knownlanguages
+    Connect(URL,"LANGUAGES")["CODES"].insert_many(dict({"code":code}) for code in list(knownlanguages))
+
 def testLanguage(text):
     global knownlanguages
     try:
@@ -64,6 +66,7 @@ def main():
     filenames=[os.path.join(dir_name,filename) for filename in filter(lambda fname: fname.endswith('.txt'), os.listdir(dir_name))]
     with Pool(cpu_count()) as p:
         p.map(openfile, filenames)
+    WriteLanguages()
 if __name__=="__main__":
     freeze_support()
     main()
