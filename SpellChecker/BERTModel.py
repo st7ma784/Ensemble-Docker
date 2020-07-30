@@ -10,13 +10,15 @@ from gensim import utils
 from unidecode import unidecode
 from itertools import repeat
 from multiprocessing import Pool, freeze_support
+from multiprocessing.pool import ThreadPool
 from gensim.summarization.textcleaner import tokenize_by_word
 import copy
 from langdetect import detect, lang_detect_exception
 import concurrent.futures as cf 
 import pymongo
-
-Words={}
+from functools import partial
+correctiondictionary=dict()
+WordRanks={}
 languages=['en']
 models={}
 def words(text): return re.findall(r'\w+', text.lower())
@@ -28,12 +30,15 @@ def P(language,word):
     # get sentence
     # how well does the word fit in the sentence. 
     # returns 0 if the word isn't in the dictionary
-    return - Words[language].get(word, 0)
+    return - WordRanks[language].get(word, 0)
 
 def correction(word,language='en'): 
+    global correctiondictionary
     "Most probable spelling correction for word."
-    LangProb=partial(P,language)
-    return max(candidates(word,language), key=LangProb)
+    if word not in correctiondictionary[language]:
+        LangProb=partial(P,language)
+        correctiondictionary[language][word]= max(candidates(word,language), key=LangProb)
+    return word,correctiondictionary[language][word]
 
 def candidates(word,language): 
     "Generate possible spelling corrections for word."
@@ -41,7 +46,7 @@ def candidates(word,language):
 
 def known(words,language): 
     #"The subset of `words` that appear in the dictionary of WORDS."
-    return set(w for w in words if w in Words[language])
+    return set(w for w in words if w in WordRanks[language])
 
 def edits1(word):
     #"All edits that are one edit away from `word`."
@@ -71,48 +76,44 @@ def editsn(word,range):
 
 def FixText(text):
     sentences= gensim.summarization.textcleaner.clean_text_by_sentences(text)
+    #in line replace may be better. 
     
-    newSentences=[]
-    for sentence in sentences:
-        #print(sentence)
-        
-        newSentences.append(FixSentence(sentence.token))
-    
+    with Pool() as p:
+        newSentences=p.map(FixSentence,[sentence.token for sentence in sentences])
+ 
     return "\n".join(newSentences)
     
 def FixDocument(Document,dirname):
     
-    try:
-        t = time()
-        with open("".join([dirname,"/",Document]),'r',encoding="utf",errors="surrogateescape") as doc:
-            text=doc.read()
-            sentences=FixText(text)
-        with open("".join(["CORRECTEDCORPORA/"+Document]),"w") as output:
-            output.writelines(sentences)
-        print('Time to correct {}: {} mins'.format(Document,round((time() - t) / 60, 2)))
-
+    #try:
+    t = time()
+    with open(os.path.join(dirname,Document),'r',encoding="utf",errors="ignore") as doc:
+        text=doc.read()
+        sentences=FixText(text)
+    with open(os.path.join("correctedtexts",Document),"w") as output:
+        output.writelines(sentences)
+    print('Time to correct {}: {} mins'.format(Document,round((time() - t) / 60, 2)))
+    '''
     except Exception as e:
         print("failed correction read for : " + Document)
         print(e)
-   
+    '''
+
 def FixSentence(sentence):
-    print(sentence)
-    listedsentence=set(gensim.summarization.textcleaner.tokenize_by_word(sentence))
+
+    #print(sentence)
+    listedsentence=list(set(gensim.summarization.textcleaner.tokenize_by_word(sentence)))
+    #print(listedsentence)
     newsentence=copy.deepcopy(sentence)
     language=detect(sentence)
-
-    for word in listedsentence:
+    lookups= map(correction,listedsentence,repeat(language))
+    #print(lookups)
+    for word,fix in filter(lambda x: x[0]!=x[1],lookups):
         '''to do
         ignore non alpha text
         change edit distance by word length? 
         '''
-        #print(word)
-        
-        if word not in correctiondictionary[language]:
-            correctiondictionary[language][word]=correction(word)
-        if correctiondictionary[language][word]!=word:
-            #print( word + " :=>  " + correctiondictionary[word])
-            newsentence=newsentence.replace(word,correctiondictionary[language][word])
+        newsentence=newsentence.replace(word,fix)
     if sentence!=newsentence:
         print( sentence + " :=> " + newsentence)
     #Sentence=" ".join(newsentence)    
@@ -146,6 +147,7 @@ def make_model(language):
 
 
 def buildLanguage(language):
+    global correctiondictionary
     print("Beginning with language : " + language)
     try:
         model = Word2Vec.load(os.path.join("models","".join([language,"word2vec.model"])))
@@ -161,24 +163,27 @@ def buildLanguage(language):
         w_rank = {}
         for i,word in enumerate(words):
             w_rank[word] = i
-        Words[language] = w_rank
-    correctiondictionary[language]={}
-
-def fixAll():
+        return w_rank
+def fixAll(dirname):
     print("Begining document fixing")
     with Pool(os.cpu_count()) as p:
         p.starmap(FixDocument,zip(list(filter(lambda fname: fname.endswith('.txt'), os.listdir(dirname))),repeat(dirname)))
     
-correctiondictionary=dict()
+
 def main():
-    languages=set([language for language in GetLanguages()])
-    if languages==set():
-        languages=set(["en"])
+    global  WordRanks, correctiondictionary
+    languages=list(GetLanguages())
+    if languages==list():
+        languages=["en"]
     print(languages)
     with Pool(os.cpu_count()) as p:
-        p.map(buildLanguage,list(languages))   
-
-
+        WordRanks=dict(zip(languages,p.map(buildLanguage,list(languages))))   
+    correctiondictionary=dict(zip(languages,repeat(dict())))
+    print("models are ready and dictionaries locked and loaded.")
+    
+    dirname="textfiles"
+    with ThreadPool(os.cpu_count()) as p:
+        p.starmap(FixDocument,zip(list(filter(lambda fname: fname.endswith('.txt'), os.listdir(dirname))),repeat(dirname)))
 if __name__=="__main__":
     freeze_support()
     main()

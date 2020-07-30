@@ -8,6 +8,8 @@ services:
       - ./SpellChecker/.env
     volumes:
       - ./models/:/app/models/
+      - ./textfiles/:/app/textfiles/
+      - ./correctedtexts/:/app/correctedtexts/
     links:
       - mongo:mongo
       
