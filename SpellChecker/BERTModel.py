@@ -12,6 +12,7 @@ from itertools import repeat
 from multiprocessing import Pool, freeze_support
 from multiprocessing.pool import ThreadPool
 from gensim.summarization.textcleaner import tokenize_by_word
+from gensim.summarization import summarize
 import copy
 #from langdetect import detect, lang_detect_exception
 import concurrent.futures as cf 
@@ -114,11 +115,11 @@ def editsn(word,range):
 
 
 def FixText(text):
-    sentences= gensim.summarization.textcleaner.clean_text_by_sentences(text)
+    sentences= gensim.summarization.textcleaner.split_sentences(text)
     #in line replace may be better. 
     
     with Pool() as p:
-        newSentences=p.map(FixSentence,[sentence.token for sentence in sentences])
+        newSentences=p.map(FixSentence,sentences)
  
     return "\n".join(newSentences)
     
@@ -133,7 +134,7 @@ def FixDocument(Document,dirname):
         with open(os.path.join(dirname,Document),'r',encoding="utf",errors="ignore") as doc:
             text=doc.read()
             sentences=FixText(text)
-        with open(os.path.join("correctedtexts",Document),"w") as output:
+        with open(outputlocation,"w") as output:
             output.writelines(sentences)
         print('Time to correct {}: {} mins'.format(Document,round((time() - t) / 60, 2)))
     else:
@@ -163,6 +164,21 @@ def FixSentence(sentence):
     #Sentence=" ".join(newsentence)    
     return newsentence
 
+def BuildSummary(Document,dirname):
+    outdir="summaryoftexts"
+    outputlocation=os.path.join(outdir,Document)
+    #try:
+    if not os.path.exists(outputlocation):
+        print("Beginning : "+Document)
+        t = time()
+        with open(os.path.join(dirname,Document),'r',encoding="utf",errors="ignore") as doc:
+            text=doc.read()
+            summmary=summarize(text, ratio=0.01)
+        with open(outputlocation,"w") as output:
+            output.write(summmary)
+        print('Time to correct {}: {} mins'.format(Document,round((time() - t) / 60, 2)))
+    else:
+        print("skipping {} as already found in {}".format(Document,outdir))
 
 
 def GetLanguages():
@@ -245,6 +261,9 @@ def main():
     with open(correctionsfilepath,"w") as output:
         print("saving corrections")
         json.dump(correctiondictionary,output)
+    with ThreadPool() as p:
+        p.starmap(BuildSummary,zip(list(filter(lambda fname: fname.endswith('.txt'), os.listdir(correctedtexts))),repeat("correctedtexts")))
+
 if __name__=="__main__":
     freeze_support()
     main()

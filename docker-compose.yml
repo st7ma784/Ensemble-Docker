@@ -11,6 +11,7 @@ services:
       - ./textfiles/:/app/textfiles/
       - ./correctedtexts/:/app/correctedtexts/
       - ./dictionary/:/app/dictionary/
+      - ./summaryoftexts/:/app/summaryoftexts/
     links:
       - mongo:mongo
       
