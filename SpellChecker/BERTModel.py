@@ -127,6 +127,8 @@ def FixDocument(Document,dirname):
     outputlocation=os.path.join(outdir,Document)
     #try:
     if not os.path.exists(outputlocation):
+        print("Beginning : "+Document)
+
         t = time()
         with open(os.path.join(dirname,Document),'r',encoding="utf",errors="ignore") as doc:
             text=doc.read()
@@ -236,8 +238,10 @@ def main():
         print("loading previous corrections...")
         with open(correctionsfilepath,"r") as input:
             correctiondictionary=json.load(input)
-    for document in list(filter(lambda fname: fname.endswith('.txt'), os.listdir(dir_name))):
-        FixDocument(document,dir_name)
+    with ThreadPool() as p:
+        p.starmap(FixDocument,zip(list(filter(lambda fname: fname.endswith('.txt'), os.listdir(dir_name))),repeat(dir_name)))
+    #for document in list(filter(lambda fname: fname.endswith('.txt'), os.listdir(dir_name))):
+    #   FixDocument(document,dir_name)
     with open(correctionsfilepath,"w") as output:
         print("saving corrections")
         json.dump(correctiondictionary,output)
