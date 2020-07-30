@@ -261,8 +261,8 @@ def main():
     with open(correctionsfilepath,"w") as output:
         print("saving corrections")
         json.dump(correctiondictionary,output)
-    with ThreadPool() as p:
-        p.starmap(BuildSummary,zip(list(filter(lambda fname: fname.endswith('.txt'), os.listdir(correctedtexts))),repeat("correctedtexts")))
+    with Pool() as p:
+        p.starmap(BuildSummary,zip(list(filter(lambda fname: fname.endswith('.txt'), os.listdir("correctedtexts"))),repeat("correctedtexts")))
 
 if __name__=="__main__":
     freeze_support()
