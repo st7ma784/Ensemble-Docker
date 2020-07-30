@@ -17,10 +17,44 @@ from langdetect import detect, lang_detect_exception
 import concurrent.futures as cf 
 import pymongo
 from functools import partial
+import json
 correctiondictionary=dict()
 WordRanks={}
 languages=['en']
 models={}
+URL= os.environ.get("MONGO_CLUSTERURI")
+start=time()
+
+def Connect(URL,collection="sentences"):
+
+  mongo=pymongo.MongoClient(URL)
+  db= mongo["Connects"] #Connect to DB
+  col=db["Access"]
+  col.insert_one({"time":datetime.now()})
+  db=mongo[collection]
+  return db
+
+def testLanguage(text):
+    try:
+        language=detect(text)#.lang#
+    except lang_detect_exception.LangDetectException as e:
+        language='UNK'
+    return language
+
+def openfile(file_name):
+    global start
+    t=time()
+    
+    DB=Connect(URL)["Sentences"]
+    with open(file_name,'r',encoding="utf",errors="ignore") as text:
+        print("Opened : " + file_name)
+        sentences= gensim.summarization.textcleaner.split_sentences(text.read())
+        sentences=filter(lambda sentence:len(sentence.split())>4,sentences)
+        DB.insert_many([{"text":sentence, "lang":testLanguage(sentence)} for sentence in sentences])
+        #return [{"text":sentence, "lang":self.testLanguage(sentence)} for sentence in sentences]
+        print('Time to upload{}: {} mins / {} mins'.format(file_name,round((time() - t) / 60, 2),round((time() - start) / 60, 2) ))
+        return 1
+
 def words(text): return re.findall(r'\w+', text.lower())
 
 def P(language,word): 
@@ -35,10 +69,13 @@ def P(language,word):
 def correction(word,language='en'): 
     global correctiondictionary
     "Most probable spelling correction for word."
-    if word not in correctiondictionary[language]:
-        LangProb=partial(P,language)
-        correctiondictionary[language][word]= max(candidates(word,language), key=LangProb)
-    return word,correctiondictionary[language][word]
+    if language in correctiondictionary:
+        if word not in correctiondictionary.get(language):
+            LangProb=partial(P,language)
+            correctiondictionary[language][word]= max(candidates(word,language), key=LangProb)
+        return word,correctiondictionary[language][word]
+    else:
+        return word, word
 
 def candidates(word,language): 
     "Generate possible spelling corrections for word."
@@ -84,15 +121,19 @@ def FixText(text):
     return "\n".join(newSentences)
     
 def FixDocument(Document,dirname):
-    
+    outdir="correctedtexts"
+    outputlocation=os.path.join(outdir,Document)
     #try:
-    t = time()
-    with open(os.path.join(dirname,Document),'r',encoding="utf",errors="ignore") as doc:
-        text=doc.read()
-        sentences=FixText(text)
-    with open(os.path.join("correctedtexts",Document),"w") as output:
-        output.writelines(sentences)
-    print('Time to correct {}: {} mins'.format(Document,round((time() - t) / 60, 2)))
+    if not os.path.exists(outputlocation):
+        t = time()
+        with open(os.path.join(dirname,Document),'r',encoding="utf",errors="ignore") as doc:
+            text=doc.read()
+            sentences=FixText(text)
+        with open(os.path.join("correctedtexts",Document),"w") as output:
+            output.writelines(sentences)
+        print('Time to correct {}: {} mins'.format(Document,round((time() - t) / 60, 2)))
+    else:
+        print("skipping {} as already found in {}".format(Document,outdir))
     '''
     except Exception as e:
         print("failed correction read for : " + Document)
@@ -106,29 +147,17 @@ def FixSentence(sentence):
     #print(listedsentence)
     newsentence=copy.deepcopy(sentence)
     language=detect(sentence)
-    lookups= map(correction,listedsentence,repeat(language))
     #print(lookups)
-    for word,fix in filter(lambda x: x[0]!=x[1],lookups):
+    for word,fix in filter(lambda x: x[0]!=x[1],map(correction,listedsentence,repeat(language))):
         '''to do
         ignore non alpha text
         change edit distance by word length? 
         '''
         newsentence=newsentence.replace(word,fix)
-    if sentence!=newsentence:
-        print( sentence + " :=> " + newsentence)
     #Sentence=" ".join(newsentence)    
     return newsentence
 
-def Connect(URL,collection):
 
-  mongo=pymongo.MongoClient(URL)
-  db= mongo["Connects"] #Connect to DB
-  col=db["Access"]
-  col.insert_one({"time":datetime.now()})
-  db=mongo[collection]
-  return db
-
-URL= os.environ.get("MONGO_CLUSTERURI")
 
 def GetLanguages():
     print("fetching languages")
@@ -169,21 +198,47 @@ def fixAll(dirname):
     with Pool(os.cpu_count()) as p:
         p.starmap(FixDocument,zip(list(filter(lambda fname: fname.endswith('.txt'), os.listdir(dirname))),repeat(dirname)))
     
-
 def main():
     global  WordRanks, correctiondictionary
+    dir_name="textfiles"
+    
+
     languages=list(GetLanguages())
     if languages==list():
-        languages=["en"]
+        #if there arent any unique languages, we may need to repopulate database.
+        print("languages not found so rebuilding vocab")
+        filenames=[os.path.join(dir_name,filename) for filename in filter(lambda fname: fname.endswith('.txt'), os.listdir(dir_name))]
+        with Pool(cpu_count()) as p:
+            done=p.map(openfile, filenames)
+            print("read from %s documents",str(sum(done)))
+        languages=list(GetLanguages())
     print(languages)
-    with Pool(os.cpu_count()) as p:
-        WordRanks=dict(zip(languages,p.map(buildLanguage,list(languages))))   
-    correctiondictionary=dict(zip(languages,repeat(dict())))
+    lookupdir="dictionary"
+    WordRankfile="WordRank.json"
+    WordRankfilepath=os.path.join(lookupdir,WordRankfile)
+    if not os.path.exists(WordRankfilepath):
+        with Pool(os.cpu_count()) as p:
+            WordRanks=dict(zip(languages,p.map(buildLanguage,list(languages))))   
+        with open(WordRankfilepath,"w") as output:
+            json.dump(WordRanks,output)
+    else:
+        with open(WordRankfilepath,"r") as input:
+            WordRanks=json.load(input)
+    
     print("models are ready and dictionaries locked and loaded.")
     
-    dirname="textfiles"
+    correctionsfile="correctionsfile.json"
+    correctionsfilepath=os.path.join(lookupdir,correctionsfile)
+    if os.path.exists(correctionsfilepath):
+        print("loading previous corrections...")
+        with open(correctionsfilepath,"r") as input:
+            correctiondictionary=json.load(input)
+    
     with ThreadPool(os.cpu_count()) as p:
-        p.starmap(FixDocument,zip(list(filter(lambda fname: fname.endswith('.txt'), os.listdir(dirname))),repeat(dirname)))
+        p.starmap(FixDocument,zip(list(filter(lambda fname: fname.endswith('.txt'), os.listdir(dir_name))),repeat(dir_name)))
+    with open(correctionsfilepath,"w") as output:
+        print("saving corrections")
+        json.dump(correctiondictionary,output)
 if __name__=="__main__":
     freeze_support()
     main()

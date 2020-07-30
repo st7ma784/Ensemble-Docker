@@ -65,7 +65,8 @@ def main():
     dir_name="textfiles"
     filenames=[os.path.join(dir_name,filename) for filename in filter(lambda fname: fname.endswith('.txt'), os.listdir(dir_name))]
     with Pool(cpu_count()) as p:
-        p.map(openfile, filenames)
+        done=p.map(openfile, filenames)
+    print("read from %s documents",str(sum(done)))
     WriteLanguages()
 if __name__=="__main__":
     freeze_support()
