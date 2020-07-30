@@ -1,6 +1,5 @@
 FROM tsutomu7/gensim as base
 FROM base 
-
 COPY requirements.txt /requirements.txt
 RUN pip install  -r /requirements.txt
 

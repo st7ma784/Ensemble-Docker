@@ -13,11 +13,12 @@ from multiprocessing import Pool, freeze_support
 from multiprocessing.pool import ThreadPool
 from gensim.summarization.textcleaner import tokenize_by_word
 import copy
-from langdetect import detect, lang_detect_exception
+#from langdetect import detect, lang_detect_exception
 import concurrent.futures as cf 
 import pymongo
 from functools import partial
 import json
+import langid
 correctiondictionary=dict()
 WordRanks={}
 languages=['en']
@@ -36,8 +37,9 @@ def Connect(URL,collection="sentences"):
 
 def testLanguage(text):
     try:
-        language=detect(text)#.lang#
-    except lang_detect_exception.LangDetectException as e:
+        language=langid.classify(text)
+        #language=detect(text)#.lang#
+    except Exception as e:
         language='UNK'
     return language
 
@@ -70,7 +72,7 @@ def correction(word,language='en'):
     global correctiondictionary
     "Most probable spelling correction for word."
     if language in correctiondictionary:
-        if word not in correctiondictionary.get(language):
+        if word not in correctiondictionary[language]:
             LangProb=partial(P,language)
             correctiondictionary[language][word]= max(candidates(word,language), key=LangProb)
         return word,correctiondictionary[language][word]
@@ -146,7 +148,9 @@ def FixSentence(sentence):
     listedsentence=list(set(gensim.summarization.textcleaner.tokenize_by_word(sentence)))
     #print(listedsentence)
     newsentence=copy.deepcopy(sentence)
-    language=detect(sentence)
+    language=langid.classify(sentence)
+    #print(b[0])
+    #language=detect(sentence)
     #print(lookups)
     for word,fix in filter(lambda x: x[0]!=x[1],map(correction,listedsentence,repeat(language))):
         '''to do
@@ -212,7 +216,6 @@ def main():
             done=p.map(openfile, filenames)
             print("read from %s documents",str(sum(done)))
         languages=list(GetLanguages())
-    print(languages)
     lookupdir="dictionary"
     WordRankfile="WordRank.json"
     WordRankfilepath=os.path.join(lookupdir,WordRankfile)
@@ -233,9 +236,8 @@ def main():
         print("loading previous corrections...")
         with open(correctionsfilepath,"r") as input:
             correctiondictionary=json.load(input)
-    
-    with ThreadPool(os.cpu_count()) as p:
-        p.starmap(FixDocument,zip(list(filter(lambda fname: fname.endswith('.txt'), os.listdir(dir_name))),repeat(dir_name)))
+    for document in list(filter(lambda fname: fname.endswith('.txt'), os.listdir(dir_name))):
+        FixDocument(document,dir_name)
     with open(correctionsfilepath,"w") as output:
         print("saving corrections")
         json.dump(correctiondictionary,output)

@@ -1,4 +1,4 @@
 unidecode
-langdetect
 pymongo
 datetime
+langid
